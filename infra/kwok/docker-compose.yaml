@@ -4,13 +4,13 @@ services:
     container_name: tcc-ksm
     network_mode: host
     volumes:
-      - ./.kubeconfig:/kubeconfig:ro
+      - ./.generated/kubeconfig:/kubeconfig:ro
     command: ["--kubeconfig=/kubeconfig"]
-  
+
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: tcc-prometheus
     network_mode: host
     volumes:
-      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
-      - ./targets:/etc/prometheus/targets:ro
+      - ./config/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./.generated/targets:/etc/prometheus/targets:ro

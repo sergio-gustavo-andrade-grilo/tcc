@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: well-sized
+  annotations:
+    kwok.x-k8s.io/usage-cpu: "400m"
+    kwok.x-k8s.io/usage-memory: "200Mi"
+spec:
+  containers:
+    - name: app
+      image: nginx
+      resources:
+        requests: { cpu: "500m", memory: 256Mi }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: over-provisioned
+  annotations:
+    kwok.x-k8s.io/usage-cpu: "100m"
+    kwok.x-k8s.io/usage-memory: "128Mi"
+spec:
+  containers:
+    - name: app
+      image: nginx
+      resources:
+        requests: { cpu: "2", memory: 2Gi }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: under-provisioned
+  annotations:
+    kwok.x-k8s.io/usage-cpu: "800m"
+    kwok.x-k8s.io/usage-memory: "512Mi"
+spec:
+  containers:
+    - name: app
+      image: nginx
+      resources:
+        requests: { cpu: "200m", memory: 128Mi }

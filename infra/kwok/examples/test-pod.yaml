@@ -7,9 +7,9 @@ metadata:
     kwok.x-k8s.io/usage-memory: "128Mi"
 spec:
   containers:
-  - name: app
-    image: nginx
-    resources:
-      requests:
-        cpu: "1"
-        memory: 512Mi
+    - name: app
+      image: nginx
+      resources:
+        requests:
+          cpu: "1"
+          memory: 512Mi
