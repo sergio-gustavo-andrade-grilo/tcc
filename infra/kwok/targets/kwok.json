@@ -1,0 +1,2 @@
+[{"targets": ["172.25.0.6:10247"],
+  "labels": {"__metrics_path__": "/metrics/nodes/kwok-node-1/metrics/resource", "node": "kwok-node-1"}}]
