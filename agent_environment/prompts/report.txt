@@ -1,0 +1,14 @@
+You are analyzing the resource usage of containers in a Kubernetes cluster.
+
+Below are findings computed from Prometheus metrics. Each line gives a container,
+a resource, the ratio of actual usage to requested resources, and a classification.
+
+{findings}
+
+Write a short report in Portuguese that:
+- gives an overview of the cluster state (how many containers per classification);
+- lists the over-provisioned containers and the under-provisioned containers;
+- mentions that findings are only as reliable as the metrics behind them.
+
+Use only the data above. Do not invent numbers or containers.
+Do not make recommendations; only describe what was observed.
