@@ -36,8 +36,16 @@ def main() -> None:
     if args.no_llm:
         return
 
+    client = OpenRouterClient()
+    
     print("\n" + "=" * 60 + "\n")
-    print(generate_report(findings, OpenRouterClient()))
+    print(generate_report(findings, client))
+    stats = client.last_stats
+    if stats:
+        print(
+            f"\n(model={stats.model} latency={stats.latency_seconds:.1f}s "
+            f"tokens in/out={stats.prompt_tokens}/{stats.completion_tokens})"
+        )
 
 
 if __name__ == "__main__":
