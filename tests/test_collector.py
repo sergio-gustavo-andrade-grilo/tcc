@@ -1,4 +1,8 @@
-from agent_environment.collectors.prometheus_client import build_metrics
+from agent_environment.collectors.prometheus_client import (
+    CPU_REQUEST,
+    build_metrics,
+    scoped,
+)
 from agent_environment.core.models import ContainerKey, Resource
 
 A = ContainerKey("default", "a", "app")
@@ -26,3 +30,12 @@ def test_age_is_joined_by_pod():
         pod_age={("default", "a"): 42.0},
     )
     assert result[0].age_seconds == 42.0
+
+def test_scoped_adds_cluster_matcher():
+    query = scoped(CPU_REQUEST, "tcc-a")
+    assert 'cluster="tcc-a"' in query
+    assert "<c>" not in query
+
+
+def test_scoped_escapes_quotes():
+    assert 'cluster="a\\"b"' in scoped(CPU_REQUEST, 'a"b')

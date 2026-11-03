@@ -2,27 +2,35 @@ import httpx
 
 from agent_environment.config import PROMETHEUS_URL
 from agent_environment.core.models import (
+    ClusterSnapshot,
     ClusterSummary,
     ContainerKey,
     ContainerMetrics,
-    Resource,
 )
 
-CPU_REQUEST = 'kube_pod_container_resource_requests{resource="cpu"}'
-MEMORY_REQUEST = 'kube_pod_container_resource_requests{resource="memory"}'
-CPU_USAGE = "rate(container_cpu_usage_seconds_total[2m])"
-MEMORY_USAGE = "container_memory_working_set_bytes"
+CPU_REQUEST = 'kube_pod_container_resource_requests{resource="cpu", <c>}'
+MEMORY_REQUEST = 'kube_pod_container_resource_requests{resource="memory", <c>}'
+CPU_USAGE = "rate(container_cpu_usage_seconds_total{<c>}[2m])"
+MEMORY_USAGE = "container_memory_working_set_bytes{<c>}"
+POD_AGE = "time() - kube_pod_start_time{<c>}"
 
-NODE_COUNT = "count(kube_node_info)"
-CPU_CAPACITY = 'sum(kube_node_status_allocatable{resource="cpu"})'
-MEMORY_CAPACITY = 'sum(kube_node_status_allocatable{resource="memory"})'
-CPU_REQUESTED = 'sum(kube_pod_container_resource_requests{resource="cpu", node!=""})'
-MEMORY_REQUESTED = 'sum(kube_pod_container_resource_requests{resource="memory", node!=""})'
-CLUSTER_CPU_USAGE = "sum(rate(container_cpu_usage_seconds_total[2m]))"
-CLUSTER_MEMORY_USAGE = "sum(container_memory_working_set_bytes)"
-PENDING_PODS = 'count(kube_pod_status_phase{phase="Pending"} == 1) or vector(0)'
+NODE_COUNT = "count(kube_node_info{<c>})"
+CPU_CAPACITY = 'sum(kube_node_status_allocatable{resource="cpu", <c>})'
+MEMORY_CAPACITY = 'sum(kube_node_status_allocatable{resource="memory", <c>})'
+CPU_REQUESTED = 'sum(kube_pod_container_resource_requests{resource="cpu", node!="", <c>})'
+MEMORY_REQUESTED = 'sum(kube_pod_container_resource_requests{resource="memory", node!="", <c>})'
+CLUSTER_CPU_USAGE = "sum(rate(container_cpu_usage_seconds_total{<c>}[2m]))"
+CLUSTER_MEMORY_USAGE = "sum(container_memory_working_set_bytes{<c>})"
+PENDING_PODS = 'count(kube_pod_status_phase{phase="Pending", <c>} == 1) or vector(0)'
 
-POD_AGE = "time() - kube_pod_start_time"
+CLUSTERS = "count by (cluster) (kube_node_info)"
+
+
+def scoped(template: str, cluster: str) -> str:
+    """Restrict a query template to one cluster."""
+    escaped = cluster.replace("\\", "\\\\").replace('"', '\\"')
+    return template.replace("<c>", f'cluster="{escaped}"')
+
 
 def build_metrics(
     cpu_request: dict[ContainerKey, float],
@@ -76,45 +84,51 @@ class PrometheusClient:
             return None
         return float(result[0]["value"][1])
 
-    def _pod_ages(self) -> dict[tuple[str, str], float]:
+    def _pod_ages(self, cluster: str) -> dict[tuple[str, str], float]:
         ages: dict[tuple[str, str], float] = {}
-        for series in self._result(POD_AGE):
+        for series in self._result(scoped(POD_AGE, cluster)):
             labels = series["metric"]
             if "namespace" in labels and "pod" in labels:
                 ages[(labels["namespace"], labels["pod"])] = float(series["value"][1])
         return ages
 
-    def collect(self) -> list[ContainerMetrics]:
+    def list_clusters(self) -> list[str]:
+        names = {
+            s["metric"]["cluster"]
+            for s in self._result(CLUSTERS)
+            if "cluster" in s["metric"]
+        }
+        return sorted(names)
+
+    def collect(self, cluster: str) -> list[ContainerMetrics]:
         return build_metrics(
-            cpu_request=self._query(CPU_REQUEST),
-            cpu_usage=self._query(CPU_USAGE),
-            memory_request=self._query(MEMORY_REQUEST),
-            memory_usage=self._query(MEMORY_USAGE),
-            pod_age=self._pod_ages(),
+            cpu_request=self._query(scoped(CPU_REQUEST, cluster)),
+            cpu_usage=self._query(scoped(CPU_USAGE, cluster)),
+            memory_request=self._query(scoped(MEMORY_REQUEST, cluster)),
+            memory_usage=self._query(scoped(MEMORY_USAGE, cluster)),
+            pod_age=self._pod_ages(cluster),
         )
 
-    def collect_summary(self) -> ClusterSummary:
-        nodes = self._scalar(NODE_COUNT)
-        pending = self._scalar(PENDING_PODS)
+    def collect_summary(self, cluster: str) -> ClusterSummary:
+        def scalar(template: str) -> float | None:
+            return self._scalar(scoped(template, cluster))
+
+        nodes = scalar(NODE_COUNT)
+        pending = scalar(PENDING_PODS)
         return ClusterSummary(
             node_count=None if nodes is None else int(nodes),
-            cpu_capacity_cores=self._scalar(CPU_CAPACITY),
-            memory_capacity_bytes=self._scalar(MEMORY_CAPACITY),
-            cpu_requested_cores=self._scalar(CPU_REQUESTED),
-            memory_requested_bytes=self._scalar(MEMORY_REQUESTED),
-            cpu_usage_cores=self._scalar(CLUSTER_CPU_USAGE),
-            memory_usage_bytes=self._scalar(CLUSTER_MEMORY_USAGE),
+            cpu_capacity_cores=scalar(CPU_CAPACITY),
+            memory_capacity_bytes=scalar(MEMORY_CAPACITY),
+            cpu_requested_cores=scalar(CPU_REQUESTED),
+            memory_requested_bytes=scalar(MEMORY_REQUESTED),
+            cpu_usage_cores=scalar(CLUSTER_CPU_USAGE),
+            memory_usage_bytes=scalar(CLUSTER_MEMORY_USAGE),
             pending_pods=None if pending is None else int(pending),
         )
 
-
-def main() -> None:
-    def fmt(value: float | None) -> str:
-        return "-" if value is None else f"{value:.2f}"
-
-    for m in PrometheusClient().collect():
-        print(f"{m.key!s:<45} cpu={fmt(m.ratio(Resource.CPU)):>6}  mem={fmt(m.ratio(Resource.MEMORY)):>6}")
-
-
-if __name__ == "__main__":
-    main()
+    def snapshot(self, cluster: str) -> ClusterSnapshot:
+        return ClusterSnapshot(
+            name=cluster,
+            summary=self.collect_summary(cluster),
+            containers=self.collect(cluster),
+        )

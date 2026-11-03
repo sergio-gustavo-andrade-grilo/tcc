@@ -1,12 +1,4 @@
 services:
-  kube-state-metrics:
-    image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0
-    container_name: tcc-ksm
-    network_mode: host
-    volumes:
-      - ./.generated/kubeconfig:/kubeconfig:ro
-    command: ["--kubeconfig=/kubeconfig"]
-
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: tcc-prometheus

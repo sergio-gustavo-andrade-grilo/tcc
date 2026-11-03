@@ -27,36 +27,53 @@ def main() -> None:
     parser.add_argument(
         "--no-llm",
         action="store_true",
-        help="print only the findings table, without calling the LLM",
+        help="print only the findings tables, without calling the LLM",
+    )
+    parser.add_argument(
+        "--cluster",
+        action="append",
+        help="cluster to report on (repeatable); default: all clusters in Prometheus",
     )
     args = parser.parse_args()
 
     prometheus = PrometheusClient()
-    thresholds = Thresholds(min_age_seconds=MIN_POD_AGE_SECONDS)
-    metrics = prometheus.collect()
-    findings = analyze(metrics, thresholds)
-    young = [m for m in metrics if not is_mature(m, thresholds)]
-    summary = prometheus.collect_summary()
-
-    print(summary_to_text(summary))
-    print()
-    print(format_findings(findings))
-    if young:
-        names = ", ".join(sorted({f"{m.key.namespace}/{m.key.pod}" for m in young}))
-        print(f"\nSkipped (younger than {thresholds.min_age_seconds:.0f}s): {names}")
-
-    if args.no_llm:
+    clusters = args.cluster or prometheus.list_clusters()
+    if not clusters:
+        print("No clusters found in Prometheus. Is the infra up?")
         return
 
-    print("\n" + "=" * 60 + "\n")
-    client = OpenRouterClient()
-    print(generate_report(findings, summary, client))
-    stats = client.last_stats
-    if stats:
-        print(
-            f"\n(model={stats.model} latency={stats.latency_seconds:.1f}s "
-            f"tokens in/out={stats.prompt_tokens}/{stats.completion_tokens})"
-        )
+    thresholds = Thresholds(min_age_seconds=MIN_POD_AGE_SECONDS)
+    client: OpenRouterClient | None = None
+
+    for name in clusters:
+        snapshot = prometheus.snapshot(name)
+        findings = analyze(snapshot.containers, thresholds)
+        young = [m for m in snapshot.containers if not is_mature(m, thresholds)]
+
+        print("=" * 60)
+        print(f"Cluster: {name}")
+        print("=" * 60)
+        print(summary_to_text(snapshot.summary))
+        print()
+        print(format_findings(findings))
+        if young:
+            pods = ", ".join(sorted({f"{m.key.namespace}/{m.key.pod}" for m in young}))
+            print(f"\nSkipped (younger than {thresholds.min_age_seconds:.0f}s): {pods}")
+
+        if args.no_llm:
+            print()
+            continue
+
+        client = client or OpenRouterClient()
+        print("\n--- report ---\n")
+        print(generate_report(name, findings, snapshot.summary, client))
+        stats = client.last_stats
+        if stats:
+            print(
+                f"\n(model={stats.model} latency={stats.latency_seconds:.1f}s "
+                f"tokens in/out={stats.prompt_tokens}/{stats.completion_tokens})"
+            )
+        print()
 
 
 if __name__ == "__main__":

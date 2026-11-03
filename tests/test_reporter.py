@@ -60,23 +60,26 @@ def test_missing_values_are_marked_unavailable():
 
 
 def test_prompt_contains_summary_and_finding():
-    prompt = build_prompt([FINDING], SUMMARY, template="{summary}\n---\n{findings}")
+    prompt = build_prompt(
+        "tcc-a", [FINDING], SUMMARY, template="{cluster}\n{summary}\n---\n{findings}"
+    )
+    assert "tcc-a" in prompt
     assert "pending pods: 2" in prompt
     assert "default/over-provisioned/app | cpu | ratio=0.05 | over_provisioned" in prompt
 
 
 def test_report_comes_from_client():
     client = FakeClient()
-    assert generate_report([FINDING], SUMMARY, client) == "fake report"
+    assert generate_report("tcc-a", [FINDING], SUMMARY, client) == "fake report"
     assert len(client.prompts) == 1
 
 
 def test_no_data_skips_the_model():
     client = FakeClient()
-    assert generate_report([], ClusterSummary(), client) == NO_DATA_REPORT
+    assert generate_report("tcc-a", [], ClusterSummary(), client) == NO_DATA_REPORT
     assert client.prompts == []
 
 
 def test_summary_without_findings_still_reports():
     client = FakeClient()
-    assert generate_report([], SUMMARY, client) == "fake report"
+    assert generate_report("tcc-a", [], SUMMARY, client) == "fake report"

@@ -54,22 +54,26 @@ def findings_to_text(findings: list[Finding]) -> str:
 
 
 def build_prompt(
+    cluster: str,
     findings: list[Finding],
     summary: ClusterSummary,
     template: str | None = None,
 ) -> str:
     if template is None:
         template = PROMPT_PATH.read_text(encoding="utf-8")
-    return template.replace("{summary}", summary_to_text(summary)).replace(
-        "{findings}", findings_to_text(findings)
+    return (
+        template.replace("{cluster}", cluster)
+        .replace("{summary}", summary_to_text(summary))
+        .replace("{findings}", findings_to_text(findings))
     )
 
 
 def generate_report(
+    cluster: str,
     findings: list[Finding],
     summary: ClusterSummary,
     client: LLMClient,
 ) -> str:
     if not findings and not summary.has_data():
         return NO_DATA_REPORT  # nothing to describe, so don't call the model
-    return client.complete(build_prompt(findings, summary))
+    return client.complete(build_prompt(cluster, findings, summary))

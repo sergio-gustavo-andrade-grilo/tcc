@@ -85,3 +85,9 @@ class ClusterSummary:
         if resource is Resource.CPU:
             return _fraction(self.cpu_usage_cores, self.cpu_capacity_cores)
         return _fraction(self.memory_usage_bytes, self.memory_capacity_bytes)
+
+@dataclass(frozen=True)
+class ClusterSnapshot:
+    name: str
+    summary: ClusterSummary
+    containers: list[ContainerMetrics]
