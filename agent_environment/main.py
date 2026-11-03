@@ -1,5 +1,6 @@
 import argparse
 
+from agent_environment.core.reporter import generate_report, summary_to_text
 from agent_environment.collectors.prometheus_client import PrometheusClient
 from agent_environment.core.analyzer import analyze
 from agent_environment.core.models import Classification, Finding
@@ -30,16 +31,20 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    findings = analyze(PrometheusClient().collect())
+    prometheus = PrometheusClient()
+    findings = analyze(prometheus.collect())
+    summary = prometheus.collect_summary()
+
+    print(summary_to_text(summary))
+    print()
     print(format_findings(findings))
 
     if args.no_llm:
         return
 
-    client = OpenRouterClient()
-    
     print("\n" + "=" * 60 + "\n")
-    print(generate_report(findings, client))
+    client = OpenRouterClient()
+    print(generate_report(findings, summary, client))
     stats = client.last_stats
     if stats:
         print(
