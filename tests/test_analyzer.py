@@ -42,3 +42,31 @@ def test_boundaries_are_well_sized():
     t = Thresholds(over_provisioned_below=0.3, under_provisioned_above=1.0)
     assert classify(0.3, t) is Classification.WELL_SIZED
     assert classify(1.0, t) is Classification.WELL_SIZED
+
+def test_young_container_is_skipped():
+    young = ContainerMetrics(
+        ContainerKey("default", "new", "app"),
+        cpu_request_cores=2.0,
+        cpu_usage_cores=0.1,
+        age_seconds=60.0,
+    )
+    assert analyze([young], Thresholds(min_age_seconds=300.0)) == []
+
+
+def test_container_at_the_age_limit_is_analyzed():
+    edge = ContainerMetrics(
+        ContainerKey("default", "edge", "app"),
+        cpu_request_cores=2.0,
+        cpu_usage_cores=0.1,
+        age_seconds=300.0,
+    )
+    assert len(analyze([edge], Thresholds(min_age_seconds=300.0))) == 1
+
+
+def test_unknown_age_is_analyzed():
+    unknown = ContainerMetrics(
+        ContainerKey("default", "unknown", "app"),
+        cpu_request_cores=2.0,
+        cpu_usage_cores=0.1,
+    )
+    assert len(analyze([unknown], Thresholds(min_age_seconds=300.0))) == 1

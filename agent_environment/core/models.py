@@ -32,6 +32,7 @@ class ContainerMetrics:
     cpu_usage_cores: float | None = None
     memory_request_bytes: float | None = None
     memory_usage_bytes: float | None = None
+    age_seconds: float | None = None
 
     def ratio(self, resource: Resource) -> float | None:
         """usage / request, or None if either value is missing or the request is 0."""

@@ -22,14 +22,17 @@ CLUSTER_CPU_USAGE = "sum(rate(container_cpu_usage_seconds_total[2m]))"
 CLUSTER_MEMORY_USAGE = "sum(container_memory_working_set_bytes)"
 PENDING_PODS = 'count(kube_pod_status_phase{phase="Pending"} == 1) or vector(0)'
 
+POD_AGE = "time() - kube_pod_start_time"
 
 def build_metrics(
     cpu_request: dict[ContainerKey, float],
     cpu_usage: dict[ContainerKey, float],
     memory_request: dict[ContainerKey, float],
     memory_usage: dict[ContainerKey, float],
+    pod_age: dict[tuple[str, str], float] | None = None,
 ) -> list[ContainerMetrics]:
-    """Join the four result sets by container. Missing values stay None."""
+    """Join the result sets by container. Missing values stay None."""
+    pod_age = pod_age or {}
     keys = cpu_request.keys() | cpu_usage.keys() | memory_request.keys() | memory_usage.keys()
     return [
         ContainerMetrics(
@@ -38,6 +41,7 @@ def build_metrics(
             cpu_usage_cores=cpu_usage.get(key),
             memory_request_bytes=memory_request.get(key),
             memory_usage_bytes=memory_usage.get(key),
+            age_seconds=pod_age.get((key.namespace, key.pod)),
         )
         for key in sorted(keys, key=str)
     ]
@@ -72,12 +76,21 @@ class PrometheusClient:
             return None
         return float(result[0]["value"][1])
 
+    def _pod_ages(self) -> dict[tuple[str, str], float]:
+        ages: dict[tuple[str, str], float] = {}
+        for series in self._result(POD_AGE):
+            labels = series["metric"]
+            if "namespace" in labels and "pod" in labels:
+                ages[(labels["namespace"], labels["pod"])] = float(series["value"][1])
+        return ages
+
     def collect(self) -> list[ContainerMetrics]:
         return build_metrics(
             cpu_request=self._query(CPU_REQUEST),
             cpu_usage=self._query(CPU_USAGE),
             memory_request=self._query(MEMORY_REQUEST),
             memory_usage=self._query(MEMORY_USAGE),
+            pod_age=self._pod_ages(),
         )
 
     def collect_summary(self) -> ClusterSummary:

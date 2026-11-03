@@ -1,11 +1,11 @@
 import argparse
 
-from agent_environment.core.reporter import generate_report, summary_to_text
 from agent_environment.collectors.prometheus_client import PrometheusClient
-from agent_environment.core.analyzer import analyze
+from agent_environment.config import MIN_POD_AGE_SECONDS
+from agent_environment.core.analyzer import Thresholds, analyze, is_mature
 from agent_environment.core.models import Classification, Finding
 from agent_environment.core.openrouter_client import OpenRouterClient
-from agent_environment.core.reporter import generate_report
+from agent_environment.core.reporter import generate_report, summary_to_text
 
 
 def format_findings(findings: list[Finding]) -> str:
@@ -32,12 +32,18 @@ def main() -> None:
     args = parser.parse_args()
 
     prometheus = PrometheusClient()
-    findings = analyze(prometheus.collect())
+    thresholds = Thresholds(min_age_seconds=MIN_POD_AGE_SECONDS)
+    metrics = prometheus.collect()
+    findings = analyze(metrics, thresholds)
+    young = [m for m in metrics if not is_mature(m, thresholds)]
     summary = prometheus.collect_summary()
 
     print(summary_to_text(summary))
     print()
     print(format_findings(findings))
+    if young:
+        names = ", ".join(sorted({f"{m.key.namespace}/{m.key.pod}" for m in young}))
+        print(f"\nSkipped (younger than {thresholds.min_age_seconds:.0f}s): {names}")
 
     if args.no_llm:
         return
