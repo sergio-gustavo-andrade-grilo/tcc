@@ -1,0 +1,10 @@
+[
+  {"at": 0, "cluster": "tcc-a", "action": "create", "pod": "well-sized", "cpu_request_m": 500, "memory_request_mi": 256, "cpu_usage_m": 400, "memory_usage_mi": 200},
+  {"at": 0, "cluster": "tcc-a", "action": "create", "pod": "over-provisioned", "cpu_request_m": 2000, "memory_request_mi": 2048, "cpu_usage_m": 100, "memory_usage_mi": 128},
+  {"at": 0, "cluster": "tcc-a", "action": "create", "pod": "under-provisioned", "cpu_request_m": 200, "memory_request_mi": 128, "cpu_usage_m": 800, "memory_usage_mi": 512},
+  {"at": 0, "cluster": "tcc-b", "action": "create", "pod": "busy-app", "cpu_request_m": 500, "memory_request_mi": 512, "cpu_usage_m": 450, "memory_usage_mi": 400},
+  {"at": 0, "cluster": "tcc-b", "action": "create", "pod": "idle-app", "cpu_request_m": 2000, "memory_request_mi": 4096, "cpu_usage_m": 50, "memory_usage_mi": 100},
+  {"at": 420, "cluster": "tcc-b", "action": "create", "pod": "too-big", "cpu_request_m": 1000000, "memory_request_mi": 1024},
+  {"at": 600, "cluster": "tcc-a", "action": "delete", "pod": "over-provisioned"},
+  {"at": 720, "cluster": "tcc-b", "action": "delete", "pod": "too-big"}
+]
