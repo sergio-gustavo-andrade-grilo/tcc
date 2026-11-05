@@ -1,6 +1,8 @@
+import re
+
 import httpx
 
-from agent_environment.config import PROMETHEUS_URL
+from agent_environment.config import CPU_RATE_WINDOW, PROMETHEUS_URL
 from agent_environment.core.models import (
     ClusterSnapshot,
     ClusterSummary,
@@ -10,7 +12,7 @@ from agent_environment.core.models import (
 
 CPU_REQUEST = 'kube_pod_container_resource_requests{resource="cpu", <c>}'
 MEMORY_REQUEST = 'kube_pod_container_resource_requests{resource="memory", <c>}'
-CPU_USAGE = "rate(container_cpu_usage_seconds_total{<c>}[2m])"
+CPU_USAGE = "rate(container_cpu_usage_seconds_total{<c>}[<w>])"
 MEMORY_USAGE = "container_memory_working_set_bytes{<c>}"
 POD_AGE = "time() - kube_pod_start_time{<c>}"
 
@@ -19,17 +21,28 @@ CPU_CAPACITY = 'sum(kube_node_status_allocatable{resource="cpu", <c>})'
 MEMORY_CAPACITY = 'sum(kube_node_status_allocatable{resource="memory", <c>})'
 CPU_REQUESTED = 'sum(kube_pod_container_resource_requests{resource="cpu", node!="", <c>})'
 MEMORY_REQUESTED = 'sum(kube_pod_container_resource_requests{resource="memory", node!="", <c>})'
-CLUSTER_CPU_USAGE = "sum(rate(container_cpu_usage_seconds_total{<c>}[2m]))"
+CLUSTER_CPU_USAGE = "sum(rate(container_cpu_usage_seconds_total{<c>}[<w>]))"
 CLUSTER_MEMORY_USAGE = "sum(container_memory_working_set_bytes{<c>})"
 PENDING_PODS = 'count(kube_pod_status_phase{phase="Pending", <c>} == 1) or vector(0)'
 
 CLUSTERS = "count by (cluster) (kube_node_info)"
 
 
-def scoped(template: str, cluster: str) -> str:
-    """Restrict a query template to one cluster."""
+_WINDOW = re.compile(r"\d+[smhd]")
+_UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+
+
+def window_seconds(window: str) -> int:
+    if not _WINDOW.fullmatch(window):
+        raise ValueError(f"invalid rate window: {window!r} (expected e.g. 30s or 2m)")
+    return int(window[:-1]) * _UNIT_SECONDS[window[-1]]
+
+
+def scoped(template: str, cluster: str, window: str = CPU_RATE_WINDOW) -> str:
+    """Restrict a query template to one cluster and set its rate window."""
+    window_seconds(window)  # validates the format
     escaped = cluster.replace("\\", "\\\\").replace('"', '\\"')
-    return template.replace("<c>", f'cluster="{escaped}"')
+    return template.replace("<c>", f'cluster="{escaped}"').replace("<w>", window)
 
 
 def build_metrics(

@@ -1,7 +1,11 @@
+import pytest
+
 from agent_environment.collectors.prometheus_client import (
     CPU_REQUEST,
+    CPU_USAGE,
     build_metrics,
     scoped,
+    window_seconds,
 )
 from agent_environment.core.models import ContainerKey, Resource
 
@@ -39,3 +43,18 @@ def test_scoped_adds_cluster_matcher():
 
 def test_scoped_escapes_quotes():
     assert 'cluster="a\\"b"' in scoped(CPU_REQUEST, 'a"b')
+
+def test_scoped_sets_rate_window():
+    query = scoped(CPU_USAGE, "tcc-a", window="30s")
+    assert "[30s]" in query
+    assert "<w>" not in query
+
+
+def test_scoped_rejects_invalid_window():
+    with pytest.raises(ValueError):
+        scoped(CPU_USAGE, "tcc-a", window="30 seconds")
+
+
+def test_window_seconds():
+    assert window_seconds("30s") == 30
+    assert window_seconds("2m") == 120

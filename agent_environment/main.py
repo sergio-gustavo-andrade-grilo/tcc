@@ -5,8 +5,11 @@ from functools import cache
 
 import httpx
 
-from agent_environment.collectors.prometheus_client import PrometheusClient
-from agent_environment.config import MIN_POD_AGE_SECONDS
+from agent_environment.collectors.prometheus_client import (
+    PrometheusClient,
+    window_seconds,
+)
+from agent_environment.config import CPU_RATE_WINDOW, MIN_POD_AGE_SECONDS
 from agent_environment.core.analyzer import Thresholds, analyze, is_mature
 from agent_environment.core.models import Classification, Finding
 from agent_environment.core.openrouter_client import OpenRouterClient
@@ -97,6 +100,11 @@ def main() -> None:
         help="generate reports every N seconds until interrupted; default: run once",
     )
     args = parser.parse_args()
+    if MIN_POD_AGE_SECONDS < window_seconds(CPU_RATE_WINDOW):
+        print(
+            f"warning: MIN_POD_AGE_SECONDS ({MIN_POD_AGE_SECONDS:g}) is shorter than "
+            f"CPU_RATE_WINDOW ({CPU_RATE_WINDOW}); new pods may be misclassified"
+        )
 
     if args.interval is not None and args.interval <= 0:
         parser.error("--interval must be positive")
