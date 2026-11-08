@@ -9,10 +9,14 @@ actual usage to requested resources, and a classification:
 
 {findings}
 
+Pods skipped because they are too young to be classified reliably:
+
+{skipped}
+
 Write a short report in Portuguese with these sections:
 1. Cluster overview: the cluster name, number of nodes, CPU and memory capacity, 
    how much of the capacity is requested (allocated) and how much is actually used,
-   and whether there are pending pods.
+   and whether there are pending pods. Mention the skipped pods, if any.
 2. Over-provisioned containers and under-provisioned containers, from the findings.
 3. A note that the findings are only as reliable as the metrics behind them.
 

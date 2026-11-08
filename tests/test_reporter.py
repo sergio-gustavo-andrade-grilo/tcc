@@ -83,3 +83,10 @@ def test_no_data_skips_the_model():
 def test_summary_without_findings_still_reports():
     client = FakeClient()
     assert generate_report("tcc-a", [], SUMMARY, client) == "fake report"
+
+
+def test_prompt_lists_pending_and_skipped():
+    summary = ClusterSummary(node_count=1, pending_pods=1, pending_pod_names=("default/too-big",))
+    prompt = build_prompt("tcc-a", [], summary, template="{summary}\n{skipped}", skipped=["default/new"])
+    assert "pending pods: 1 (default/too-big)" in prompt
+    assert "default/new" in prompt

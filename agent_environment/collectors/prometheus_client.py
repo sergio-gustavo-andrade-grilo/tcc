@@ -24,6 +24,7 @@ MEMORY_REQUESTED = 'sum(kube_pod_container_resource_requests{resource="memory", 
 CLUSTER_CPU_USAGE = "sum(rate(container_cpu_usage_seconds_total{<c>}[<w>]))"
 CLUSTER_MEMORY_USAGE = "sum(container_memory_working_set_bytes{<c>})"
 PENDING_PODS = 'count(kube_pod_status_phase{phase="Pending", <c>} == 1) or vector(0)'
+PENDING_POD_NAMES = 'kube_pod_status_phase{phase="Pending", <c>} == 1'
 
 CLUSTERS = "count by (cluster) (kube_node_info)"
 
@@ -43,6 +44,15 @@ def scoped(template: str, cluster: str, window: str = CPU_RATE_WINDOW) -> str:
     window_seconds(window)  # validates the format
     escaped = cluster.replace("\\", "\\\\").replace('"', '\\"')
     return template.replace("<c>", f'cluster="{escaped}"').replace("<w>", window)
+
+
+def _pending_names(self, cluster: str) -> tuple[str, ...]:
+    names = {
+        f"{s['metric']['namespace']}/{s['metric']['pod']}"
+        for s in self._result(scoped(PENDING_POD_NAMES, cluster))
+        if "namespace" in s["metric"] and "pod" in s["metric"]
+    }
+    return tuple(sorted(names))
 
 
 def build_metrics(
@@ -137,6 +147,7 @@ class PrometheusClient:
             cpu_usage_cores=scalar(CLUSTER_CPU_USAGE),
             memory_usage_bytes=scalar(CLUSTER_MEMORY_USAGE),
             pending_pods=None if pending is None else int(pending),
+            pending_pod_names=self._pending_names(cluster),
         )
 
     def snapshot(self, cluster: str) -> ClusterSnapshot:

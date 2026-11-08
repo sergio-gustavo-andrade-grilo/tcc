@@ -69,7 +69,8 @@ class ClusterSummary:
     memory_requested_bytes: float | None = None
     cpu_usage_cores: float | None = None
     memory_usage_bytes: float | None = None
-    pending_pods: int | None = None
+    pending_pods: int | None = None,
+    pending_pod_names: tuple[str, ...] = ()
 
     def has_data(self) -> bool:
         return bool(self.node_count)

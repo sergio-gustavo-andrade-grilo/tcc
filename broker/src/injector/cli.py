@@ -30,7 +30,12 @@ def main() -> None:
             print(f"t={e.at_seconds / args.speed:>6.0f}s  {e.cluster}  {e.action.value}  {e.pod.namespace}/{e.pod.name}")
         return
 
-    failures = replay(events, KubectlRunner(), speed=args.speed)
+    try:
+        failures = replay(events, KubectlRunner(), speed=args.speed)
+    except KeyboardInterrupt:
+        print("\ninterrupted; pods already created were left in the clusters")
+        raise SystemExit(130)
+    
     print(f"done, {failures} failed event(s)")
     raise SystemExit(1 if failures else 0)
 

@@ -9,10 +9,15 @@ from agent_environment.collectors.prometheus_client import (
     PrometheusClient,
     window_seconds,
 )
-from agent_environment.config import CPU_RATE_WINDOW, MIN_POD_AGE_SECONDS
+from agent_environment.config import (
+    CPU_RATE_WINDOW,
+    MIN_POD_AGE_SECONDS,
+    REPORT_LOG_PATH,
+)
 from agent_environment.core.analyzer import Thresholds, analyze, is_mature
 from agent_environment.core.models import Classification, Finding
 from agent_environment.core.openrouter_client import OpenRouterClient
+from agent_environment.core.report_log import ReportRecord, append_record
 from agent_environment.core.reporter import generate_report, summary_to_text
 
 
@@ -62,19 +67,36 @@ def run_once(
             print()
             print(format_findings(findings))
             if young:
-                pods = ", ".join(sorted({f"{m.key.namespace}/{m.key.pod}" for m in young}))
-                print(f"\nSkipped (younger than {thresholds.min_age_seconds:.0f}s): {pods}")
+                skipped = sorted({f"{m.key.namespace}/{m.key.pod}" for m in young})
+                if skipped:
+                    print(f"\nSkipped (younger than {thresholds.min_age_seconds:.0f}s): {', '.join(skipped)}")
 
             if use_llm:
                 client = get_client()
+                client.last_stats = None  # otherwise a skipped call would log stale numbers
+                report = generate_report(name, findings, snapshot.summary, client, skipped=skipped)
                 print("\n--- report ---\n")
-                print(generate_report(name, findings, snapshot.summary, client))
+                print(report)
                 stats = client.last_stats
                 if stats:
                     print(
                         f"\n(model={stats.model} latency={stats.latency_seconds:.1f}s "
                         f"tokens in/out={stats.prompt_tokens}/{stats.completion_tokens})"
                     )
+                append_record(
+                    REPORT_LOG_PATH,
+                    ReportRecord(
+                        timestamp=stamp,
+                        cluster=name,
+                        containers=len(snapshot.containers),
+                        findings=len(findings),
+                        model=stats.model if stats else None,
+                        latency_seconds=stats.latency_seconds if stats else None,
+                        prompt_tokens=stats.prompt_tokens if stats else None,
+                        completion_tokens=stats.completion_tokens if stats else None,
+                        report=report,
+                    ),
+                )
             print()
         except httpx.HTTPError as error:
             if not keep_going:
