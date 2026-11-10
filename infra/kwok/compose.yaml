@@ -1,0 +1,24 @@
+# Prometheus + kube-state-metrics for ONE KWOK cluster (set CLUSTER).
+# Usage: CLUSTER=tcc-a docker compose -f infra/kwok/compose.yaml up -d
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: tcc-prometheus
+    network_mode: host
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./.generated/targets:/etc/prometheus/targets:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.listen-address=:${PROMETHEUS_PORT:-9091}
+
+  kube-state-metrics:
+    image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0
+    container_name: tcc-ksm
+    network_mode: host
+    volumes:
+      - ./.generated/${CLUSTER:?set CLUSTER}/kubeconfig:/kubeconfig:ro
+    command:
+      - --kubeconfig=/kubeconfig
+      - --port=${KSM_PORT:-8081}
+      - --telemetry-port=${KSM_TELEMETRY_PORT:-8082}

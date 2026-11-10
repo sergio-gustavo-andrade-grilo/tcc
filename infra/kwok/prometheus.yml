@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  # Cluster state: pods, nodes, requests
+  - job_name: kube-state-metrics
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/ksm-*.json"]
+
+  # Simulated usage exposed by the KWOK controller
+  - job_name: kwok-usage
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/usage-*.json"]
